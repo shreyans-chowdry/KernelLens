@@ -112,6 +112,10 @@ class LLMRootCauseAnalyzer:
         async with httpx.AsyncClient(timeout=30.0) as client:
             res = await client.post(url, headers=headers, json=payload)
             data = res.json()
+            if "candidates" not in data:
+                logger.error(f"Gemini API Error Response: {json.dumps(data, indent=2)}")
+                raise KeyError(f"'candidates' not in response. API said: {data.get('error', data)}")
+                
             content = data["candidates"][0]["content"]["parts"][0]["text"]
 
             try:

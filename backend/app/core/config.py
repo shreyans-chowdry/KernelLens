@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     
     # LLM Configuration
     GEMINI_API_KEY: Optional[str] = Field(default=None, validation_alias="GEMINI_API_KEY")
-    LLM_MODEL: str = "gemini-1.5-flash"
+    LLM_MODEL: str = "gemini-3.6-flash"
     
     # Anomaly Classifier Settings
     ANOMALY_THRESHOLD: float = 0.65
