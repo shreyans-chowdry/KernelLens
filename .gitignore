@@ -14,7 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+/lib/
 lib64/
 parts/
 sdist/
@@ -63,7 +63,7 @@ Thumbs.db
 *.swo
 
 # Logs & temporary runtimes
-logs/
+/logs/
 *.log
 *.db
 *.sqlite3

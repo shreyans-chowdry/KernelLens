@@ -8,6 +8,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from backend.app.api import events, incidents
 from backend.app.core.config import settings
 from backend.app.core.database import init_db
+from backend.app.api.routes_logs import router as logs_router
+from backend.app.api.routes_analytics import router as analytics_router
+from backend.app.api.routes_demo import router as demo_router
 
 
 @asynccontextmanager
@@ -32,6 +35,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register API routers under /api/v1
+app.include_router(logs_router, prefix=settings.API_V1_STR)
+app.include_router(analytics_router, prefix=settings.API_V1_STR)
+app.include_router(demo_router, prefix=settings.API_V1_STR)
+
 
 
 # =========================================================================

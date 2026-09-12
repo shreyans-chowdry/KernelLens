@@ -2,7 +2,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select, desc
+from pydantic import BaseModel, Field
+from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -27,6 +28,11 @@ from backend.app.models.schemas import (
 from backend.app.pipeline.llm_analysis import analyze_root_cause
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
+
+
+class StatusUpdate(BaseModel):
+    status: str = Field(..., pattern=r"^(active|resolved)$")
+
 
 
 async def _load_incident(incident_id: str, db: AsyncSession) -> Optional[IncidentModel]:
@@ -101,6 +107,22 @@ async def list_incidents(
     incidents = res.scalars().all()
 
     return [IncidentRead.model_validate(inc) for inc in incidents]
+
+
+@router.get(
+    "/count",
+    responses={400: {"model": ErrorEnvelope}},
+)
+async def get_incident_count(
+    status_filter: Optional[str] = Query(None, alias="status", pattern="^(active|resolved)$"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Total incident count, optionally filtered by status."""
+    stmt = select(func.count(IncidentModel.id))
+    if status_filter:
+        stmt = stmt.where(IncidentModel.status == status_filter)
+    result = await db.execute(stmt)
+    return {"count": result.scalar() or 0}
 
 
 @router.get(
@@ -278,3 +300,27 @@ async def get_troubleshooting(
         TroubleshootingSuggestionRead.model_validate(s)
         for s in inc.troubleshooting_suggestions
     ]
+
+
+@router.patch(
+    "/{incident_id}/status",
+    response_model=IncidentRead,
+    responses={404: {"model": ErrorEnvelope}},
+)
+async def update_incident_status(
+    incident_id: str,
+    body: StatusUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update incident status (active ↔ resolved)."""
+    inc = await _load_incident(incident_id, db)
+    if not inc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "INCIDENT_NOT_FOUND", "message": f"Incident '{incident_id}' not found"},
+        )
+    inc.status = body.status
+    await db.commit()
+    await db.refresh(inc)
+    return IncidentRead.model_validate(inc)
+
