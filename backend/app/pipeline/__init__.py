@@ -1,0 +1,18 @@
+"""KernelLens Pipeline Package"""
+from backend.app.pipeline.parser import parse_log, KernelLogParser
+from backend.app.pipeline.collector import ingest_log_event, LinuxLogCollector, generate_synthetic_events
+from backend.app.pipeline.pollers import DmesgPoller, JournalctlPoller
+from backend.app.pipeline.persistence import LogPersistenceService, persist_log_event, persist_log_events_batch
+
+__all__ = [
+    "parse_log",
+    "KernelLogParser",
+    "ingest_log_event",
+    "LinuxLogCollector",
+    "generate_synthetic_events",
+    "DmesgPoller",
+    "JournalctlPoller",
+    "LogPersistenceService",
+    "persist_log_event",
+    "persist_log_events_batch",
+]

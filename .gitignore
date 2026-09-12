@@ -65,6 +65,11 @@ Thumbs.db
 # Logs & temporary runtimes
 logs/
 *.log
+*.db
+*.sqlite3
+*.sqlite
+*.bin
 scratch/
 tmp/
 temp/
+
