@@ -23,32 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.models.entities import LogEventModel, IncidentModel
 from backend.app.core.database import AsyncSessionLocal
-
-
-@dataclass
-class IncidentCluster:
-    """
-    Representation of a correlated group of candidate anomalous events.
-    Forms the candidate incident boundary for context construction.
-    """
-    cluster_id: str
-    events: List[LogEventModel] = field(default_factory=list)
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-
-    @property
-    def event_count(self) -> int:
-        return len(self.events)
-
-    @property
-    def duration_seconds(self) -> float:
-        if self.start_time and self.end_time:
-            return max(0.0, (self.end_time - self.start_time).total_seconds())
-        return 0.0
-
-    @property
-    def event_ids(self) -> List[str]:
-        return [e.id for e in self.events]
+from backend.app.ml.event_correlation import SemanticTemporalCorrelator, IncidentCluster
 
 
 class TemporalCorrelationScaffold:
@@ -130,16 +105,33 @@ class TemporalCorrelationScaffold:
         )
 
 
-# Global singleton instance
+# Global singleton instance for legacy temporal-only correlation
 _correlation_scaffold = TemporalCorrelationScaffold(window_seconds=30.0)
 
 
 def correlate_events(
+    candidate_events: List[LogEventModel],
+    window_seconds: float = 60.0,
+    similarity_threshold: float = 0.08,
+) -> List[IncidentCluster]:
+    """
+    Core operation: correlate_events(candidate_events, window) -> list[IncidentCluster]
+    Powered by the Real Semantic-Temporal Correlation Model per Section 3.2.2 of Review 1 Report.
+    Combines TF-IDF vector similarity with temporal windowing and causal chaining.
+    """
+    from backend.app.ml.event_correlation import SemanticTemporalCorrelator
+    correlator = SemanticTemporalCorrelator(
+        window_seconds=window_seconds,
+        similarity_threshold=similarity_threshold,
+    )
+    return correlator.correlate_events(candidate_events)
+
+
+def correlate_events_temporal_only(
     candidate_events: List[LogEventModel], window_seconds: float = 30.0
 ) -> List[IncidentCluster]:
     """
-    Functional interface: correlate_events(candidate_events, window) -> list[IncidentCluster]
-    (Throwaway MVP scaffold implementation)
+    Legacy temporal-only correlation interface (without semantic vector similarity).
     """
     scaffold = TemporalCorrelationScaffold(window_seconds=window_seconds)
     return scaffold.correlate_events(candidate_events)
