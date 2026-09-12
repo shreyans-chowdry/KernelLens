@@ -60,6 +60,7 @@ export interface Incident {
   correlated_event_ids: string[];
   evidence_list: Evidence[];
   troubleshooting_suggestions: TroubleshootingSuggestion[];
+  events?: LogEvent[];
 }
 
 export interface IncidentCount {

@@ -115,7 +115,8 @@ export async function fetchIncidentDetail(id: string): Promise<Incident> {
   } catch {
     const incident = MOCK_INCIDENTS.find((i) => i.id === id);
     if (!incident) throw new Error('Incident not found');
-    return incident;
+    const events = incident.events || MOCK_LOG_EVENTS.filter((e) => incident.correlated_event_ids.includes(e.id));
+    return { ...incident, events };
   }
 }
 
