@@ -96,7 +96,7 @@ class KernelLogParser:
         lower_line = cleaned_text.lower()
         if any(k in lower_line for k in ["panic", "emergency", "fatal", "oom-killer", "out of memory", "critical medium error"]):
             parsed_fields["log_level"] = "crit"
-        elif any(k in lower_line for k in ["error", "err", "failed", "failure", "corrupt", "fault", "segfault", "abort"]):
+        elif any(k in lower_line for k in ["error", "err", "failed", "failure", "corrupt", "fault", "segfault", "abort", "denied", "permission denied"]):
             parsed_fields["log_level"] = "error"
         elif any(k in lower_line for k in ["warn", "warning", "throttle", "throttled", "retry"]):
             parsed_fields["log_level"] = "warning"
