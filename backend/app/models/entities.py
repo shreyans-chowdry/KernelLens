@@ -21,7 +21,7 @@ class LogEventModel(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     source: Mapped[str] = mapped_column(String(32), index=True)  # dmesg | journalctl | file | synthetic
     raw_text: Mapped[str] = mapped_column(Text, nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     template_id: Mapped[Optional[str]] = mapped_column(String(64), index=True, nullable=True)
     parsed_fields: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
     host: Mapped[str] = mapped_column(String(128), default="localhost", index=True)
@@ -61,7 +61,7 @@ class IncidentModel(Base):
     __tablename__ = "incidents"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     status: Mapped[str] = mapped_column(String(32), default="active", index=True)  # active | resolved
     root_cause_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     confidence: Mapped[float] = mapped_column(Float, default=0.0)
@@ -120,5 +120,5 @@ class ModelVersionModel(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     type: Mapped[str] = mapped_column(String(32), index=True)  # classifier | embedding
     version_tag: Mapped[str] = mapped_column(String(64), index=True)
-    trained_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    trained_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     metrics_json: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)

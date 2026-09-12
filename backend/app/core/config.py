@@ -6,7 +6,7 @@ from typing import Optional
 class Settings(BaseSettings):
     PROJECT_NAME: str = "KernelLens AI"
     API_V1_STR: str = "/api/v1"
-    DATABASE_URL: str = "sqlite+aiosqlite:///./kernellens.db"
+    DATABASE_URL: str = "postgresql+asyncpg://shreyanschowdry@localhost:5432/kernellens"
     
     # LLM Configuration
     GEMINI_API_KEY: Optional[str] = Field(default=None, validation_alias="GEMINI_API_KEY")
