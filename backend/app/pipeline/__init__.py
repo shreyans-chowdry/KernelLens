@@ -11,10 +11,12 @@ from backend.app.pipeline.anomaly_filter import (
 )
 from backend.app.pipeline.correlation import (
     correlate_events,
+    correlate_events_temporal_only,
     persist_incident_clusters,
     IncidentCluster,
     TemporalCorrelationScaffold,
 )
+from backend.app.ml.event_correlation import SemanticTemporalCorrelator
 
 __all__ = [
     "parse_log",
@@ -32,7 +34,9 @@ __all__ = [
     "persist_anomaly_scores",
     "RuleBasedAnomalyFilterScaffold",
     "correlate_events",
+    "correlate_events_temporal_only",
     "persist_incident_clusters",
     "IncidentCluster",
     "TemporalCorrelationScaffold",
+    "SemanticTemporalCorrelator",
 ]
