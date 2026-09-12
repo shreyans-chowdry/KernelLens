@@ -3,6 +3,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.core.config import settings
 from backend.app.core.database import init_db
+from backend.app.api.routes_logs import router as logs_router
+from backend.app.api.routes_incidents import router as incidents_router
+from backend.app.api.routes_analytics import router as analytics_router
+from backend.app.api.routes_demo import router as demo_router
 
 
 @asynccontextmanager
@@ -27,6 +31,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register API routers under /api/v1
+app.include_router(logs_router, prefix=settings.API_V1_STR)
+app.include_router(incidents_router, prefix=settings.API_V1_STR)
+app.include_router(analytics_router, prefix=settings.API_V1_STR)
+app.include_router(demo_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")
