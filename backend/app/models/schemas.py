@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 # ==========================================
@@ -91,22 +91,57 @@ class CommandSuggestion(BaseModel):
     rationale: str = Field(..., description="Why running this command confirms or clarifies the incident")
 
 
+
+# ==========================================
+# Error Envelope Schema
+# ==========================================
+class ErrorDetail(BaseModel):
+    code: str = Field(..., description="Machine-readable error code")
+    message: str = Field(..., description="Human-readable error description")
+    details: Dict[str, Any] = Field(default_factory=dict, description="Additional context or validation details")
+
+
+class ErrorEnvelope(BaseModel):
+    error: ErrorDetail
+
+
 class RootCauseAnalysisResult(BaseModel):
     """
     Strictly enforced Pydantic output schema for LLM root-cause analysis.
     Must never be a free-text blob.
     """
     cause: str = Field(..., min_length=5, description="Identified root cause summary")
-    evidence: List[EvidenceItem] = Field(..., min_length=1, description="List of evidence items linking to specific events")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score between 0.0 and 1.0")
+    evidence: List[EvidenceItem] = Field(..., description="List of evidence items linking to specific events")
+    confidence: float = Field(..., description="Confidence score between 0.0 and 1.0")
     troubleshooting_commands: List[CommandSuggestion] = Field(
         ..., description="Copy-only troubleshooting and diagnostic guidance commands"
     )
+
+    @field_validator("evidence")
+    @classmethod
+    def validate_non_empty_evidence(cls, v: List[EvidenceItem]) -> List[EvidenceItem]:
+        if not v or len(v) == 0:
+            raise ValueError("Root cause analysis must cite at least one specific log_event_id as evidence")
+        return v
+
+    @field_validator("confidence")
+    @classmethod
+    def validate_confidence_range(cls, v: float) -> float:
+        if not (0.0 <= v <= 1.0):
+            raise ValueError("Confidence must be a float between 0.0 and 1.0")
+        return round(float(v), 3)
 
 
 # ==========================================
 # 5. Incident & Evidence Schemas
 # ==========================================
+class IncidentCreate(BaseModel):
+    status: Literal["active", "resolved"] = "active"
+    root_cause_summary: Optional[str] = None
+    confidence: float = 0.0
+    correlated_event_ids: List[str] = Field(default_factory=list)
+
+
 class EvidenceRead(BaseModel):
     id: str
     incident_id: str
@@ -136,6 +171,10 @@ class IncidentRead(BaseModel):
     troubleshooting_suggestions: List[TroubleshootingSuggestionRead] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class IncidentDetailRead(IncidentRead):
+    events: List[LogEventRead] = Field(default_factory=list)
 
 
 # ==========================================

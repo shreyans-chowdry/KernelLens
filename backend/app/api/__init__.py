@@ -1,4 +1,4 @@
 """
-KernelLens AI — REST API Routes
-Exposes the pipeline data (logs, incidents, analytics) to the Next.js dashboard.
+KernelLens AI — REST API Package
+Exposes pipeline data, ingestion endpoints, incident analysis, and analytics to the Next.js dashboard.
 """

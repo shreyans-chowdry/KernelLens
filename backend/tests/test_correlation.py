@@ -8,7 +8,7 @@ from backend.app.core.database import init_db, AsyncSessionLocal
 from backend.app.models.entities import LogEventModel, IncidentModel
 from backend.app.pipeline.collector import ingest_log_event
 from backend.app.pipeline.correlation import (
-    correlate_events,
+    correlate_events_temporal_only as correlate_events,
     persist_incident_clusters,
     IncidentCluster,
     TemporalCorrelationScaffold,
