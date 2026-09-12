@@ -79,7 +79,9 @@ class LogFeatureExtractor:
         # 2. Time-since-last-occurrence feature (in seconds)
         last_ts = self.template_last_seen.get(template_id)
         if last_ts is not None and ts is not None:
-            time_since_last_sec = max(0.0, (ts - last_ts).total_seconds())
+            ts_norm = ts if ts.tzinfo is not None else ts.replace(tzinfo=timezone.utc)
+            last_ts_norm = last_ts if last_ts.tzinfo is not None else last_ts.replace(tzinfo=timezone.utc)
+            time_since_last_sec = max(0.0, (ts_norm - last_ts_norm).total_seconds())
             is_novel = 0.0
         else:
             time_since_last_sec = 3600.0  # Sentinel for first occurrence / rare template
