@@ -9,6 +9,12 @@ from backend.app.pipeline.anomaly_filter import (
     persist_anomaly_scores,
     RuleBasedAnomalyFilterScaffold,
 )
+from backend.app.pipeline.correlation import (
+    correlate_events,
+    persist_incident_clusters,
+    IncidentCluster,
+    TemporalCorrelationScaffold,
+)
 
 __all__ = [
     "parse_log",
@@ -25,4 +31,8 @@ __all__ = [
     "filter_anomalies",
     "persist_anomaly_scores",
     "RuleBasedAnomalyFilterScaffold",
+    "correlate_events",
+    "persist_incident_clusters",
+    "IncidentCluster",
+    "TemporalCorrelationScaffold",
 ]
