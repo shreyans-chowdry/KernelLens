@@ -3,6 +3,12 @@ from backend.app.pipeline.parser import parse_log, KernelLogParser
 from backend.app.pipeline.collector import ingest_log_event, LinuxLogCollector, generate_synthetic_events
 from backend.app.pipeline.pollers import DmesgPoller, JournalctlPoller
 from backend.app.pipeline.persistence import LogPersistenceService, persist_log_event, persist_log_events_batch
+from backend.app.pipeline.anomaly_filter import (
+    score_anomaly,
+    filter_anomalies,
+    persist_anomaly_scores,
+    RuleBasedAnomalyFilterScaffold,
+)
 
 __all__ = [
     "parse_log",
@@ -15,4 +21,8 @@ __all__ = [
     "LogPersistenceService",
     "persist_log_event",
     "persist_log_events_batch",
+    "score_anomaly",
+    "filter_anomalies",
+    "persist_anomaly_scores",
+    "RuleBasedAnomalyFilterScaffold",
 ]
