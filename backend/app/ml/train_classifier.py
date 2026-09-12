@@ -45,9 +45,9 @@ def train_and_save_model(model_save_path: str = DEFAULT_MODEL_PATH) -> Dict[str,
     print(f"Loading {len(LOGHUB_BENCHMARK_DATA)} Loghub benchmark records (BGL, HDFS, Linux)...")
     events, labels = prepare_training_samples()
 
-    # Stratified 80/20 train/test split
+    # Chronological 80/20 train/test split (no shuffling, per Le & Zhang's caution)
     train_events, val_events, train_labels, val_labels = train_test_split(
-        events, labels, test_size=0.20, random_state=42, stratify=labels
+        events, labels, test_size=0.20, shuffle=False
     )
 
     print(f"Training Anomaly Classifier on {len(train_labels)} samples (evaluating on {len(val_labels)} validation samples)...")
