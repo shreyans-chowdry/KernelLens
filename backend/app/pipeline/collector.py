@@ -183,7 +183,7 @@ def generate_synthetic_events(scenario_name: str, host: str = "linux-lab-01") ->
         # Stagger timestamps slightly
         event = ingest_log_event(
             raw_line=line,
-            source="synthetic",
+            source="dmesg",
             host=host,
             timestamp=now
         )

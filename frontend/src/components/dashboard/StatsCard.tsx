@@ -31,7 +31,8 @@ export default function StatsCard({
     const timeout = setTimeout(() => {
       const duration = 1000;
       const steps = 30;
-      const increment = value / steps;
+      const safeValue = value || 0;
+      const increment = safeValue / steps;
       let current = 0;
       let step = 0;
 
@@ -68,7 +69,7 @@ export default function StatsCard({
 
       <div className="flex items-baseline gap-1">
         <span className="text-3xl font-bold text-kl-black tabular-nums">
-          {Number.isInteger(value) ? Math.round(displayValue) : displayValue.toFixed(1)}
+          {Number.isInteger(value ?? 0) ? Math.round(Number(displayValue) || 0) : (Number(displayValue) || 0).toFixed(1)}
         </span>
         {suffix && (
           <span className="text-sm font-medium text-kl-gray-400">{suffix}</span>

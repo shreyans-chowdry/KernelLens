@@ -114,9 +114,6 @@ export default function ConfidenceGauge({
             >
               {percentage}%
             </span>
-            <span className="text-[9px] font-medium text-kl-gray-400 uppercase tracking-wider">
-              Certainty
-            </span>
           </div>
         )}
       </div>

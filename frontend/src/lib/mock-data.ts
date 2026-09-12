@@ -11,7 +11,7 @@ import type { LogEvent, Incident, PipelineStats, LogStats, TimelinePoint } from 
 export const MOCK_LOG_EVENTS: LogEvent[] = [
   {
     id: 'log-001',
-    source: 'synthetic',
+    source: 'dmesg',
     raw_text: '[ 4200.101230] systemd[1]: high memory pressure detected on cgroup /user.slice',
     timestamp: new Date(Date.now() - 3600000).toISOString(),
     template_id: 'tpl-mem-pressure',
@@ -20,7 +20,7 @@ export const MOCK_LOG_EVENTS: LogEvent[] = [
   },
   {
     id: 'log-002',
-    source: 'synthetic',
+    source: 'dmesg',
     raw_text: '[ 4200.101280] postgres: page allocation failure: order:2, mode:0x14040c0(GFP_KERNEL|__GFP_COMP)',
     timestamp: new Date(Date.now() - 3598000).toISOString(),
     template_id: 'tpl-alloc-fail',
@@ -29,7 +29,7 @@ export const MOCK_LOG_EVENTS: LogEvent[] = [
   },
   {
     id: 'log-003',
-    source: 'synthetic',
+    source: 'dmesg',
     raw_text: '[ 4200.101450] Out of memory: Killed process 2841 (postgres) total-vm:8451000kB, anon-rss:7892040kB',
     timestamp: new Date(Date.now() - 3596000).toISOString(),
     template_id: 'tpl-oom-kill',
@@ -38,7 +38,7 @@ export const MOCK_LOG_EVENTS: LogEvent[] = [
   },
   {
     id: 'log-004',
-    source: 'synthetic',
+    source: 'dmesg',
     raw_text: '[ 4200.101700] systemd[1]: postgresql.service: Failed with result \'oom-kill\'.',
     timestamp: new Date(Date.now() - 3594000).toISOString(),
     template_id: 'tpl-service-fail',
@@ -47,7 +47,7 @@ export const MOCK_LOG_EVENTS: LogEvent[] = [
   },
   {
     id: 'log-005',
-    source: 'synthetic',
+    source: 'dmesg',
     raw_text: '[ 5120.401100] sd 0:0:0:0: [sda] tag#12 FAILED Result: hostbyte=DID_OK driverbyte=DRIVER_OK',
     timestamp: new Date(Date.now() - 7200000).toISOString(),
     template_id: 'tpl-scsi-fail',
@@ -56,7 +56,7 @@ export const MOCK_LOG_EVENTS: LogEvent[] = [
   },
   {
     id: 'log-006',
-    source: 'synthetic',
+    source: 'dmesg',
     raw_text: '[ 5120.401250] Buffer I/O error on dev sda1, logical block 5242880, async page read',
     timestamp: new Date(Date.now() - 7198000).toISOString(),
     template_id: 'tpl-io-error',
@@ -65,7 +65,7 @@ export const MOCK_LOG_EVENTS: LogEvent[] = [
   },
   {
     id: 'log-007',
-    source: 'synthetic',
+    source: 'dmesg',
     raw_text: '[ 5120.401310] EXT4-fs error (device sda1): ext4_lookup:1841: inode #262145: comm worker: deleted inode referenced',
     timestamp: new Date(Date.now() - 7196000).toISOString(),
     template_id: 'tpl-ext4-error',
@@ -74,7 +74,7 @@ export const MOCK_LOG_EVENTS: LogEvent[] = [
   },
   {
     id: 'log-008',
-    source: 'synthetic',
+    source: 'dmesg',
     raw_text: '[ 5120.401450] EXT4-fs (device sda1): Remounting filesystem read-only',
     timestamp: new Date(Date.now() - 7194000).toISOString(),
     template_id: 'tpl-ext4-ro',
@@ -83,7 +83,7 @@ export const MOCK_LOG_EVENTS: LogEvent[] = [
   },
   {
     id: 'log-009',
-    source: 'synthetic',
+    source: 'dmesg',
     raw_text: '[ 1205.882100] python3[18492]: segfault at 7ffe00000000 ip 00007f31c2810140 sp 00007ffe01238910 error 4 in libc.so.6',
     timestamp: new Date(Date.now() - 1800000).toISOString(),
     template_id: 'tpl-segfault',
@@ -92,7 +92,7 @@ export const MOCK_LOG_EVENTS: LogEvent[] = [
   },
   {
     id: 'log-010',
-    source: 'synthetic',
+    source: 'dmesg',
     raw_text: '[ 3004.120000] thermal thermal_zone0: critical temperature reached (102 C), shutting down',
     timestamp: new Date(Date.now() - 900000).toISOString(),
     template_id: 'tpl-thermal-crit',
@@ -101,7 +101,7 @@ export const MOCK_LOG_EVENTS: LogEvent[] = [
   },
   {
     id: 'log-011',
-    source: 'synthetic',
+    source: 'dmesg',
     raw_text: '[  12.012300] usb 1-1: new high-speed USB device number 2 using xhci_hcd',
     timestamp: new Date(Date.now() - 600000).toISOString(),
     template_id: 'tpl-usb-new',
@@ -110,7 +110,7 @@ export const MOCK_LOG_EVENTS: LogEvent[] = [
   },
   {
     id: 'log-012',
-    source: 'synthetic',
+    source: 'dmesg',
     raw_text: '[  15.401200] eth0: Link is Up - 1Gbps/Full - flow control rx/tx',
     timestamp: new Date(Date.now() - 500000).toISOString(),
     template_id: 'tpl-net-link',
@@ -294,7 +294,7 @@ export const MOCK_PIPELINE_STATS: PipelineStats = {
 export const MOCK_LOG_STATS: LogStats = {
   total_logs: 38,
   anomaly_count: 12,
-  sources: { dmesg: 0, journalctl: 0, file: 0, synthetic: 38 },
+  sources: { dmesg: 38, journalctl: 0, file: 0, synthetic: 0 },
 };
 
 // ============================================

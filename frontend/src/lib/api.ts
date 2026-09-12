@@ -1,7 +1,7 @@
 /**
  * KernelLens AI — Unified API Client
  * Handles all communication with the FastAPI backend.
- * Falls back to mock data when the backend is unavailable.
+ * Strict mode: No mock data fallbacks.
  */
 
 import type {
@@ -14,13 +14,6 @@ import type {
   TimelinePoint,
   SeedResult,
 } from './types';
-import {
-  MOCK_LOG_EVENTS,
-  MOCK_INCIDENTS,
-  MOCK_PIPELINE_STATS,
-  MOCK_LOG_STATS,
-  MOCK_TIMELINE,
-} from './mock-data';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -40,7 +33,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
     return res.json();
   } catch (error) {
-    console.warn(`API fetch failed for ${path}, using mock data:`, error);
+    console.warn(`API fetch failed for ${path}:`, error);
     throw error;
   }
 }
@@ -66,25 +59,19 @@ export async function fetchLogs(params?: {
   try {
     return await apiFetch<LogEvent[]>(`/logs${qs ? `?${qs}` : ''}`);
   } catch {
-    return MOCK_LOG_EVENTS;
+    return [];
   }
 }
 
 export async function fetchLogDetail(id: string): Promise<LogEventDetail> {
-  try {
-    return await apiFetch<LogEventDetail>(`/logs/${id}`);
-  } catch {
-    const event = MOCK_LOG_EVENTS.find((e) => e.id === id);
-    if (!event) throw new Error('Log event not found');
-    return { ...event, anomaly_scores: [] };
-  }
+  return await apiFetch<LogEventDetail>(`/logs/${id}`);
 }
 
 export async function fetchLogStats(): Promise<LogStats> {
   try {
     return await apiFetch<LogStats>('/logs/stats');
   } catch {
-    return MOCK_LOG_STATS;
+    return { total_logs: 0, anomaly_count: 0, sources: {} };
   }
 }
 
@@ -105,19 +92,12 @@ export async function fetchIncidents(params?: {
   try {
     return await apiFetch<Incident[]>(`/incidents${qs ? `?${qs}` : ''}`);
   } catch {
-    return MOCK_INCIDENTS;
+    return [];
   }
 }
 
 export async function fetchIncidentDetail(id: string): Promise<Incident> {
-  try {
-    return await apiFetch<Incident>(`/incidents/${id}`);
-  } catch {
-    const incident = MOCK_INCIDENTS.find((i) => i.id === id);
-    if (!incident) throw new Error('Incident not found');
-    const events = incident.events || MOCK_LOG_EVENTS.filter((e) => incident.correlated_event_ids.includes(e.id));
-    return { ...incident, events };
-  }
+  return await apiFetch<Incident>(`/incidents/${id}`);
 }
 
 export async function fetchIncidentCount(status?: string): Promise<IncidentCount> {
@@ -125,7 +105,7 @@ export async function fetchIncidentCount(status?: string): Promise<IncidentCount
   try {
     return await apiFetch<IncidentCount>(`/incidents/count${qs}`);
   } catch {
-    return { count: MOCK_INCIDENTS.filter((i) => !status || i.status === status).length };
+    return { count: 0 };
   }
 }
 
@@ -143,7 +123,14 @@ export async function fetchPipelineStats(): Promise<PipelineStats> {
   try {
     return await apiFetch<PipelineStats>('/analytics/pipeline');
   } catch {
-    return MOCK_PIPELINE_STATS;
+    return {
+      total_logs_ingested: 0,
+      anomalies_detected: 0,
+      incidents_created: 0,
+      noise_reduction_pct: 0,
+      avg_confidence_score: 0,
+      active_incidents: 0,
+    };
   }
 }
 
@@ -151,7 +138,7 @@ export async function fetchTimeline(): Promise<TimelinePoint[]> {
   try {
     return await apiFetch<TimelinePoint[]>('/analytics/timeline');
   } catch {
-    return MOCK_TIMELINE;
+    return [];
   }
 }
 
