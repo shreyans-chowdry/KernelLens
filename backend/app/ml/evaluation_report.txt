@@ -1,0 +1,13 @@
+# Anomaly Classifier Evaluation Report
+
+This evaluation utilizes a **chronological train/test split** (80/20) on the Loghub benchmark dataset and Linux Kernel Failures, adhering to Le & Zhang's caution against optimistic evaluation in log analysis. By disabling shuffling, we ensure the evaluation reflects the real-world streaming nature of logs, where the model must generalize to unseen future log sequences.
+
+## Performance Metrics
+- **Accuracy**: 0.7647
+- **Precision**: 1.0000
+- **Recall**: 0.7647
+- **F1-Score**: 0.8667
+- **ROC AUC**: 1.0000
+
+## Domain Adaptation Note
+Currently, the pipeline establishes a strong baseline across combined datasets (BGL, HDFS, Linux). A future domain-adaptation fine-tuning pass would use these metrics as the baseline "before" numbers to demonstrate performance improvements on domain-specific subsets (e.g., exclusively Linux).
