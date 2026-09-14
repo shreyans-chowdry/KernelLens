@@ -124,12 +124,12 @@ export async function fetchPipelineStats(): Promise<PipelineStats> {
     return await apiFetch<PipelineStats>('/analytics/pipeline');
   } catch {
     return {
-      total_logs_ingested: 0,
-      anomalies_detected: 0,
-      incidents_created: 0,
-      noise_reduction_pct: 0,
-      avg_confidence_score: 0,
+      total_logs: 0,
+      anomaly_count: 0,
+      incident_count: 0,
       active_incidents: 0,
+      resolved_incidents: 0,
+      reduction_ratio_pct: 0,
     };
   }
 }
