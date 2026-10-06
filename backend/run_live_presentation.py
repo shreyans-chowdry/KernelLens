@@ -38,12 +38,20 @@ async def clear_database():
     print("✅ Database cleanly reset! Dashboard now displays 0 logs, 0 anomalies, 0 incidents.\n")
 
 
-async def stream_live_incident_cascade(scenario_name: str, host: str = "linux-prod-node01", delay_per_line: float = 0.25):
+async def stream_live_incident_cascade(
+    scenario_name: str,
+    host: str = "linux-prod-node01",
+    delay_per_line: float = 0.15,
+    include_background_noise: bool = True
+):
     """
-    Streams realistic kernel failure telemetry in real-time into the live pipeline.
-    Assigns authentic OS sources ('dmesg' for kernel buffer, 'journalctl' for system services).
+    Streams realistic kernel & system telemetry in real-time into the live pipeline.
+    Interleaves genuine normal background telemetry (cron, systemd, USB, networking, ACPI)
+    with critical fault sequences to demonstrate Novelty Point 1: Context Reduction.
     """
-    lines = SYNTHETIC_SCENARIOS.get(scenario_name, SYNTHETIC_SCENARIOS["normal_baseline"])
+    fault_lines = SYNTHETIC_SCENARIOS.get(scenario_name, SYNTHETIC_SCENARIOS["ext4_disk_corruption"])
+    normal_pool = SYNTHETIC_SCENARIOS.get("normal_baseline", [])
+
     scenario_titles = {
         "ext4_disk_corruption": "BLOCK STORAGE & EXT4 FILESYSTEM DEGRADATION",
         "segfault_storm": "USERSPACE CRASH & REPEATED SEGMENTATION FAULT CASCADE",
@@ -52,16 +60,31 @@ async def stream_live_incident_cascade(scenario_name: str, host: str = "linux-pr
     }
     title = scenario_titles.get(scenario_name, scenario_name.upper())
 
-    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] ⚡ [KERNEL-STREAM] Active Ingest: {title}")
-    print(f"  -> Connected to telemetry stream: {host} (Kernel ring buffer & systemd journal)")
+    # Assemble realistic mixed telemetry sequence
+    if include_background_noise and len(normal_pool) >= 20:
+        pre_noise = normal_pool[:22]
+        post_noise = normal_pool[22:34]
+        stream_sequence = [(line, False) for line in pre_noise] + \
+                          [(line, True) for line in fault_lines] + \
+                          [(line, False) for line in post_noise]
+    else:
+        stream_sequence = [(line, True) for line in fault_lines]
+
+    print("\n" + "=" * 80)
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] ⚡ [STAGE 1 & 2: TELEMETRY STREAM & ML FILTERING] {title}")
+    print(f"  -> Host: {host} (Kernel ring buffer [dmesg] & systemd journal [journalctl])")
+    print(f"  -> Total Telemetry Stream: {len(stream_sequence)} log events (Simulating live Linux production traffic)")
+    print("=" * 80)
 
     now = datetime.now(timezone.utc)
     events = []
+    anomaly_scores = []
+    anomalous_events = []
 
-    # Stream lines sequentially with live real-time delay
-    for i, line in enumerate(lines):
-        # Determine authentic source
-        if "systemd" in line or "service" in line:
+    # Stream and score in real time
+    for i, (line, is_fault_phase) in enumerate(stream_sequence):
+        # Determine authentic Linux source
+        if any(k in line for k in ["systemd", "cron", "sshd", "fstrim", "logind"]):
             source = "journalctl"
         else:
             source = "dmesg"
@@ -73,31 +96,37 @@ async def stream_live_incident_cascade(scenario_name: str, host: str = "linux-pr
             timestamp=now + timedelta(seconds=i * 2)
         )
         events.append(event)
-        
-        # Display live incoming log line
-        prefix = "[dmesg]     " if source == "dmesg" else "[journalctl]"
-        print(f"     {prefix} {line[:95]}")
+
+        # Run Stage 2 Supervised ML Inference
+        score_model = score_anomaly(event, update_state=False)
+        score_model.log_event_id = event.id
+        anomaly_scores.append(score_model)
+
+        # Display live incoming log with real-time classification
+        src_tag = f"[{source:<10}]"
+        if score_model.is_anomalous:
+            status_tag = f"\033[91m[CRITICAL ANOMALY]\033[0m (p={score_model.score:.3f})"
+            anomalous_events.append(event)
+        else:
+            status_tag = f"\033[92m[NORMAL FILTERED]\033[0m  (p={score_model.score:.3f})"
+
+        print(f"  {src_tag} {status_tag} {line[:80]}")
         await asyncio.sleep(delay_per_line)
 
     async with AsyncSessionLocal() as db:
-        # 1. Ingest events into database
+        # Ingest events and scores into PostgreSQL
         db.add_all(events)
         await db.flush()
-
-        # 2. Machine Learning Anomaly Detection
-        print(f"  -> [ML-CLASSIFIER] Running Supervised Random Forest Inference...")
-        anomalous_events = []
-        anomaly_scores = []
-        for event in events:
-            score_model = score_anomaly(event, update_state=False)
-            score_model.log_event_id = event.id
-            anomaly_scores.append(score_model)
-            if score_model.is_anomalous:
-                anomalous_events.append(event)
-
         db.add_all(anomaly_scores)
         await db.flush()
-        print(f"     ✓ Scored {len(events)} events | {len(anomalous_events)} flagged as critical anomalies (p >= 0.65)")
+
+        reduction_ratio = round((1 - (len(anomalous_events) / len(events))) * 100, 2)
+        print("\n" + "-" * 80)
+        print(f"  ✓ Stage 2 Complete: Ingested {len(events)} events into database.")
+        print(f"    - Benign Background Noise: {len(events) - len(anomalous_events)} events filtered out (p < 0.65)")
+        print(f"    - Flagged Critical Anomalies: {len(anomalous_events)} events (p >= 0.65)")
+        print(f"    - Context Reduction Ratio: {reduction_ratio}% noise filtered before LLM")
+        print("-" * 80)
 
         if not anomalous_events:
             await db.commit()
@@ -105,17 +134,19 @@ async def stream_live_incident_cascade(scenario_name: str, host: str = "linux-pr
             return
 
         # 3. Semantic-Temporal Event Correlation
-        print("  -> [CORRELATION-ENGINE] Executing Semantic-Temporal Graph Clustering (TF-IDF + BFS)...")
+        print("\n[STAGE 3: TEMPORAL & CAUSAL GRAPH CORRELATION]")
+        print("  -> Executing Semantic-Temporal Graph Clustering (TF-IDF + BFS)...")
         clusters = correlate_events(anomalous_events, window_seconds=60.0, similarity_threshold=0.05)
         if not clusters:
             await db.commit()
             return
 
         cluster = clusters[0]
-        print(f"     ✓ Formed Incident Cluster #{cluster.cluster_id} with {len(cluster.events)} correlated causal events")
+        print(f"  ✓ Formed Incident Cluster #{cluster.cluster_id} with {len(cluster.events)} correlated causal events")
 
         # 4. LLM Root Cause Analysis
-        print("  -> [GENAI-REASONING] Generating Grounded Root-Cause Analysis via Gemini...")
+        print("\n[STAGE 4: GROUNDED GENAI ROOT-CAUSE ANALYSIS (GEMINI)]")
+        print("  -> Querying Google Generative AI via official API endpoint...")
         events_summary = [
             IncidentEventSummary(
                 event_id=ev.id,
@@ -131,10 +162,10 @@ async def stream_live_incident_cascade(scenario_name: str, host: str = "linux-pr
             cluster_id=cluster.cluster_id,
             time_window_start=events_summary[0].timestamp,
             time_window_end=events_summary[-1].timestamp,
-            total_raw_logs_processed=len(events) * 3,
+            total_raw_logs_processed=len(events),
             anomalous_events_count=len(anomalous_events),
             correlated_events_count=len(cluster.events),
-            reduction_ratio_pct=round((1 - (len(cluster.events) / (len(events) * 3))) * 100, 2),
+            reduction_ratio_pct=reduction_ratio,
             primary_suspect_subsystem="kernel",
             events=events_summary
         )
@@ -142,7 +173,7 @@ async def stream_live_incident_cascade(scenario_name: str, host: str = "linux-pr
         start_time = time.time()
         analysis = await analyze_root_cause(context)
         elapsed = time.time() - start_time
-        print(f"     ✓ Gemini diagnosis completed in {elapsed:.2f}s (Confidence: {analysis.confidence * 100:.1f}%)")
+        print(f"  ✓ Gemini diagnosis completed in {elapsed:.2f}s (Confidence: {analysis.confidence * 100:.1f}%)")
 
         # 5. Persist Incident & Evidence
         incident = IncidentModel(
@@ -175,8 +206,23 @@ async def stream_live_incident_cascade(scenario_name: str, host: str = "linux-pr
             db.add(cmd_model)
 
         await db.commit()
-        print(f"  -> [DATABASE] Persisted Incident, Evidence Citations & Remediation Guidance")
-        print(f"✅ Active Incident ID: {incident.id}\n")
+
+        # Print Executive Summary Box
+        print("\n" + "=" * 80)
+        print("📊 TELEMETRY INGESTION & PIPELINE SUMMARY")
+        print("=" * 80)
+        print(f"  Total Raw Telemetry Logs Ingested:    {len(events)}")
+        print(f"  Normal Benign Logs (p < 0.65):        {len(events) - len(anomalous_events)} ({reduction_ratio}% filtered noise)")
+        print(f"  Critical Anomalous Events (p >= 0.65): {len(anomalous_events)}")
+        print(f"  Context Reduction Ratio:              {reduction_ratio}%")
+        print(f"  Correlated Incident Clusters Formed:  1")
+        print(f"  Active Incident ID:                   {incident.id}")
+        print(f"  Root Cause Summary:                   {analysis.cause[:90]}...")
+        print(f"  Gemini Diagnostic Confidence:         {analysis.confidence * 100:.1f}%")
+        print(f"  Evidence Citations Count:             {len(analysis.evidence)} causal events cited")
+        print(f"  Remediation Commands Suggested:       {len(analysis.troubleshooting_commands)}")
+        print("=" * 80)
+        print(f"🌐 Dashboard Live: Visit http://localhost:3000 to inspect logs and incident analytics.\n")
 
 
 async def stream_live_host_kernel(duration_seconds: int = 15):

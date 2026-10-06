@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     
     # LLM Configuration
     GEMINI_API_KEY: Optional[str] = Field(default=None, validation_alias="GEMINI_API_KEY")
-    LLM_MODEL: str = "gemini-3.6-flash"
+    LLM_MODEL: str = "gemini-3.5-flash"
     
     # Anomaly Classifier Settings
     ANOMALY_THRESHOLD: float = 0.65
@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     DRAIN3_STATE_FILE: str = "./backend/app/pipeline/drain3_state.bin"
 
     model_config = {
-        "env_file": ".env",
+        "env_file": [".env", "backend/.env"],
         "case_sensitive": True,
         "extra": "ignore"
     }
