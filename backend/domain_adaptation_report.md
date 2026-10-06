@@ -12,9 +12,9 @@ This report summarizes the performance of the anomaly classifier before and afte
 | Metric | Base Model (Pre-Trained) | Fine-Tuned Model (Domain-Adapted) | Improvement |
 | :--- | :--- | :--- | :--- |
 | **Accuracy** | 0.6364 | 0.7273 | +0.0909 |
-| **Precision** | 0.6667 | 0.7500 | +0.0833 |
-| **Recall** | 0.4000 | 0.6000 | +0.2000 |
-| **F1-Score** | 0.5000 | 0.6667 | +0.1667 |
+| **Precision** | 1.0000 | 1.0000 | +0.0000 |
+| **Recall** | 0.2000 | 0.4000 | +0.2000 |
+| **F1-Score** | 0.3333 | 0.5714 | +0.2381 |
 
 ## Conclusion
 As demonstrated, fine-tuning the base generalized model with a small, curated set of domain-specific logs dramatically improves recall and F1-score for the target environment, mitigating the domain shift between standard Linux logs and MacOS-specific subsystems like Jetsam and launchd.
