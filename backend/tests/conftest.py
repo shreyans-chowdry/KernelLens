@@ -46,3 +46,12 @@ async def async_client(db_session):
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def reset_ml_state():
+    from backend.app.pipeline.anomaly_filter import _ml_filter
+    _ml_filter.pipeline.feature_extractor.reset_streaming_state()
+    yield
+    _ml_filter.pipeline.feature_extractor.reset_streaming_state()
+

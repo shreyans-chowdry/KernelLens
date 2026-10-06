@@ -174,7 +174,9 @@ SYNTHETIC_SCENARIOS: Dict[str, List[str]] = {
 }
 
 
-def generate_synthetic_events(scenario_name: str, host: str = "linux-lab-01") -> List[LogEventModel]:
+def generate_synthetic_events(
+    scenario_name: str, host: str = "linux-lab-01", source: str = "synthetic"
+) -> List[LogEventModel]:
     """Generate a batch of LogEventModel entities for a known scenario."""
     lines = SYNTHETIC_SCENARIOS.get(scenario_name, SYNTHETIC_SCENARIOS["normal_baseline"])
     events = []
@@ -183,7 +185,7 @@ def generate_synthetic_events(scenario_name: str, host: str = "linux-lab-01") ->
         # Stagger timestamps slightly
         event = ingest_log_event(
             raw_line=line,
-            source="dmesg",
+            source=source,
             host=host,
             timestamp=now
         )
