@@ -97,7 +97,13 @@ class LLMRootCauseAnalyzer:
         )
 
     async def _call_gemini_with_retry(self, prompt: str, context: ContextPayload) -> RootCauseAnalysisResult:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={settings.GEMINI_API_KEY}"
+        candidate_models = [self.model]
+        if "flash-latest" not in self.model:
+            candidate_models.append("gemini-flash-latest")
+        if "3.5-flash" not in self.model:
+            candidate_models.append("gemini-3.5-flash")
+
+        last_error = None
         headers = {"Content-Type": "application/json"}
         payload = {
             "contents": [
@@ -110,39 +116,51 @@ class LLMRootCauseAnalyzer:
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:
-            res = await client.post(url, headers=headers, json=payload)
-            data = res.json()
-            if "candidates" not in data:
-                logger.error(f"Gemini API Error Response: {json.dumps(data, indent=2)}")
-                raise KeyError(f"'candidates' not in response. API said: {data.get('error', data)}")
-                
-            content = data["candidates"][0]["content"]["parts"][0]["text"]
+            for model_name in candidate_models:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={settings.GEMINI_API_KEY}"
+                try:
+                    res = await client.post(url, headers=headers, json=payload)
+                    data = res.json()
+                    if "candidates" not in data:
+                        err_msg = data.get("error", {}).get("message", str(data.get("error", data)))
+                        logger.warning(f"Gemini API returned error for {model_name}: {err_msg}. Trying next candidate...")
+                        last_error = KeyError(f"'candidates' not in response for {model_name}. API said: {err_msg}")
+                        continue
 
-            try:
-                parsed = extract_json_from_text(content)
-                return RootCauseAnalysisResult.model_validate(parsed)
-            except Exception as err:
-                logger.warning(f"LLM validation failed: {err}. Retrying once with explicit schema follow-up...")
-                retry_payload = {
-                    "contents": [
-                        {"role": "user", "parts": [{"text": f"{SYSTEM_PROMPT}\n\n{prompt}"}]},
-                        {"role": "model", "parts": [{"text": content}]},
-                        {
-                            "role": "user",
-                            "parts": [{
-                                "text": f"your last response was invalid JSON, matching this schema, try again. Error: {err}"
-                            }]
+                    content = data["candidates"][0]["content"]["parts"][0]["text"]
+                    try:
+                        parsed = extract_json_from_text(content)
+                        return RootCauseAnalysisResult.model_validate(parsed)
+                    except Exception as parse_err:
+                        logger.warning(f"LLM validation failed on {model_name}: {parse_err}. Retrying once with explicit schema follow-up...")
+                        retry_payload = {
+                            "contents": [
+                                {"role": "user", "parts": [{"text": f"{SYSTEM_PROMPT}\n\n{prompt}"}]},
+                                {"role": "model", "parts": [{"text": content}]},
+                                {
+                                    "role": "user",
+                                    "parts": [{
+                                        "text": f"your last response was invalid JSON, matching this schema, try again. Error: {parse_err}"
+                                    }]
+                                }
+                            ],
+                            "generationConfig": {
+                                "temperature": 0.0,
+                                "responseMimeType": "application/json"
+                            }
                         }
-                    ],
-                    "generationConfig": {
-                        "temperature": 0.0,
-                        "responseMimeType": "application/json"
-                    }
-                }
-                res_retry = await client.post(url, headers=headers, json=retry_payload)
-                retry_content = res_retry.json()["candidates"][0]["content"]["parts"][0]["text"]
-                parsed_retry = extract_json_from_text(retry_content)
-                return RootCauseAnalysisResult.model_validate(parsed_retry)
+                        res_retry = await client.post(url, headers=headers, json=retry_payload)
+                        retry_content = res_retry.json()["candidates"][0]["content"]["parts"][0]["text"]
+                        parsed_retry = extract_json_from_text(retry_content)
+                        return RootCauseAnalysisResult.model_validate(parsed_retry)
+                except Exception as call_err:
+                    last_error = call_err
+                    logger.warning(f"Error calling {model_name}: {call_err}. Trying next candidate...")
+                    continue
+
+            if last_error:
+                raise last_error
+            raise RuntimeError("All Gemini candidate models failed.")
 
     def _local_semantic_analysis(self, context: ContextPayload) -> RootCauseAnalysisResult:
         """
