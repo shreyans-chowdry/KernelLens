@@ -13,7 +13,6 @@ from backend.app.ml.classifier import (
     DEFAULT_MODEL_PATH,
     MODEL_VERSION_TAG,
 )
-from backend.app.ml.train_classifier import train_and_save_model
 
 logger = logging.getLogger("kernellens.anomaly_filter")
 
@@ -109,6 +108,7 @@ class MLAnomalyFilter:
                 logger.warning(f"Failed to load existing model ({e}); training fresh model...")
 
         logger.info("Training supervised Anomaly Classifier on Loghub benchmark...")
+        from backend.app.ml.train_classifier import train_and_save_model  # lazy: avoids import cycle
         train_and_save_model(self.model_path)
         return AnomalyClassifierPipeline.load(self.model_path)
 

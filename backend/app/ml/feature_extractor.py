@@ -6,7 +6,6 @@ from sklearn.preprocessing import StandardScaler
 from scipy.sparse import hstack, csr_matrix
 
 from backend.app.models.entities import LogEventModel
-from backend.app.pipeline.parser import parse_log
 
 SEVERITY_WEIGHTS = {
     "crit": 4.0,
@@ -60,11 +59,14 @@ class LogFeatureExtractor:
         if isinstance(event, LogEventModel):
             template_id = event.template_id or "TPL_UNKNOWN"
             parsed_fields = event.parsed_fields or {}
-            ts = event.timestamp or datetime.now(timezone.utc)
+            ts = event.timestamp
         else:
             template_id = event.get("template_id", "TPL_UNKNOWN")
             parsed_fields = event.get("parsed_fields", {})
-            ts = event.get("timestamp", datetime.now(timezone.utc))
+            # Labelled training samples carry no timestamp. Do NOT substitute
+            # datetime.now(): that made the time feature depend on how fast the
+            # loop ran, so training/evaluation results changed from run to run.
+            ts = event.get("timestamp")
 
         log_level = parsed_fields.get("log_level", "info")
         severity_val = SEVERITY_WEIGHTS.get(log_level, 1.0)
@@ -78,7 +80,15 @@ class LogFeatureExtractor:
 
         # 2. Time-since-last-occurrence feature (in seconds)
         last_ts = self.template_last_seen.get(template_id)
-        if last_ts is not None and ts is not None:
+        if current_count > 0 and ts is None:
+            # Untimestamped repeat (training data): treat the batch as simultaneous
+            time_since_last_sec = 0.0
+            is_novel = 0.0
+        elif current_count > 0 and last_ts is None:
+            # Template known only from untimestamped training data: seen, but long ago
+            time_since_last_sec = 3600.0
+            is_novel = 0.0
+        elif last_ts is not None and ts is not None:
             ts_norm = ts if ts.tzinfo is not None else ts.replace(tzinfo=timezone.utc)
             last_ts_norm = last_ts if last_ts.tzinfo is not None else last_ts.replace(tzinfo=timezone.utc)
             time_since_last_sec = max(0.0, (ts_norm - last_ts_norm).total_seconds())
