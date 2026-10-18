@@ -4,6 +4,10 @@ GET /api/v1/analytics/pipeline  — Pipeline reduction ratio stats
 GET /api/v1/analytics/timeline  — Incident count bucketed by hour
 """
 
+from collections import defaultdict
+from datetime import datetime
+from typing import Dict
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import select, func, extract
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -61,18 +65,15 @@ async def get_pipeline_stats(db: AsyncSession = Depends(get_db)):
 @router.get("/timeline")
 async def get_incident_timeline(db: AsyncSession = Depends(get_db)):
     """Incident count bucketed by hour for timeline charts."""
-    query = (
-        select(
-            func.date_trunc("hour", IncidentModel.created_at).label("hour"),
-            func.count(IncidentModel.id).label("count"),
-        )
-        .group_by("hour")
-        .order_by("hour")
-    )
-    result = await db.execute(query)
-    rows = result.all()
+    # Bucketed in Python (date_trunc is PostgreSQL-only and breaks on SQLite)
+    result = await db.execute(select(IncidentModel.created_at))
+    buckets: Dict[datetime, int] = defaultdict(int)
+    for (created_at,) in result.all():
+        if created_at is None:
+            continue
+        buckets[created_at.replace(minute=0, second=0, microsecond=0)] += 1
 
     return [
-        {"hour": row.hour.isoformat() if row.hour else None, "count": row.count}
-        for row in rows
+        {"hour": hour.isoformat(), "count": count}
+        for hour, count in sorted(buckets.items())
     ]

@@ -18,7 +18,7 @@ from backend.app.core.database import AsyncSessionLocal, init_db
 from backend.app.pipeline.collector import ingest_log_event, SYNTHETIC_SCENARIOS
 from backend.app.pipeline.anomaly_filter import score_anomaly
 from backend.app.pipeline.correlation import correlate_events
-from backend.app.pipeline.llm_analysis import analyze_root_cause
+from backend.app.pipeline.llm_analysis import analyze_root_cause, llm_analyzer
 from backend.app.models.entities import (
     LogEventModel, AnomalyScoreModel, IncidentModel, EvidenceModel, TroubleshootingSuggestionModel
 )
@@ -141,7 +141,7 @@ async def stream_live_incident_cascade(
             await db.commit()
             return
 
-        cluster = clusters[0]
+        cluster = max(clusters, key=lambda c: len(c.events))
         print(f"  ✓ Formed Incident Cluster #{cluster.cluster_id} with {len(cluster.events)} correlated causal events")
 
         # 4. LLM Root Cause Analysis
@@ -173,7 +173,8 @@ async def stream_live_incident_cascade(
         start_time = time.time()
         analysis = await analyze_root_cause(context)
         elapsed = time.time() - start_time
-        print(f"  ✓ Gemini diagnosis completed in {elapsed:.2f}s (Confidence: {analysis.confidence * 100:.1f}%)")
+        engine = llm_analyzer.last_engine
+        print(f"  ✓ {engine} diagnosis completed in {elapsed:.2f}s (Confidence: {analysis.confidence * 100:.1f}%)")
 
         # 5. Persist Incident & Evidence
         incident = IncidentModel(
@@ -215,10 +216,11 @@ async def stream_live_incident_cascade(
         print(f"  Normal Benign Logs (p < 0.65):        {len(events) - len(anomalous_events)} ({reduction_ratio}% filtered noise)")
         print(f"  Critical Anomalous Events (p >= 0.65): {len(anomalous_events)}")
         print(f"  Context Reduction Ratio:              {reduction_ratio}%")
-        print(f"  Correlated Incident Clusters Formed:  1")
+        print(f"  Correlated Incident Clusters Formed:  {len(clusters)} (analyzed largest)")
         print(f"  Active Incident ID:                   {incident.id}")
         print(f"  Root Cause Summary:                   {analysis.cause[:90]}...")
-        print(f"  Gemini Diagnostic Confidence:         {analysis.confidence * 100:.1f}%")
+        print(f"  Diagnosis Engine:                     {engine}")
+        print(f"  Diagnostic Confidence:                {analysis.confidence * 100:.1f}%")
         print(f"  Evidence Citations Count:             {len(analysis.evidence)} causal events cited")
         print(f"  Remediation Commands Suggested:       {len(analysis.troubleshooting_commands)}")
         print("=" * 80)

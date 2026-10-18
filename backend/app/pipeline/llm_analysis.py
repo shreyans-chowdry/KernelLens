@@ -63,6 +63,8 @@ class LLMRootCauseAnalyzer:
     """
     def __init__(self):
         self.model = settings.LLM_MODEL
+        # Which engine produced the most recent result (for honest demo/CLI output)
+        self.last_engine: str = "Local fallback engine"
 
     async def analyze(self, context: ContextPayload) -> RootCauseAnalysisResult:
         prompt = self._build_prompt(context)
@@ -70,12 +72,36 @@ class LLMRootCauseAnalyzer:
         # Check Gemini API Key
         if settings.GEMINI_API_KEY:
             try:
-                return await self._call_gemini_with_retry(prompt, context)
+                result = await self._call_gemini_with_retry(prompt, context)
             except Exception as e:
                 logger.warning(f"External LLM call failed: {e}. Falling back to calibrated local reasoning engine.")
                 return self._local_semantic_analysis(context)
+            grounded = self._ground_evidence(result, context)
+            if grounded is not None:
+                return grounded
+            logger.warning("LLM cited no valid log_event_ids from the context. Falling back to local reasoning engine.")
+            return self._local_semantic_analysis(context)
         else:
             return self._local_semantic_analysis(context)
+
+    @staticmethod
+    def _ground_evidence(
+        result: RootCauseAnalysisResult, context: ContextPayload
+    ) -> Optional[RootCauseAnalysisResult]:
+        """
+        Keep only evidence items whose log_event_id exists in the correlated context.
+        Hallucinated IDs would otherwise be persisted as evidence (and violate the
+        evidence.log_event_id foreign key on PostgreSQL). Returns None if nothing valid remains.
+        """
+        valid_ids = {e.event_id for e in context.events}
+        kept = [item for item in result.evidence if item.log_event_id in valid_ids]
+        if not kept:
+            return None
+        if len(kept) != len(result.evidence):
+            logger.warning(
+                f"Dropped {len(result.evidence) - len(kept)} evidence item(s) citing unknown log_event_ids."
+            )
+        return result.model_copy(update={"evidence": kept})
 
     def _build_prompt(self, context: ContextPayload) -> str:
         events_summary = [
@@ -104,7 +130,7 @@ class LLMRootCauseAnalyzer:
             candidate_models.append("gemini-3.5-flash")
 
         last_error = None
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json", "x-goog-api-key": settings.GEMINI_API_KEY}
         payload = {
             "contents": [
                 {"role": "user", "parts": [{"text": f"{SYSTEM_PROMPT}\n\n{prompt}"}]}
@@ -117,7 +143,7 @@ class LLMRootCauseAnalyzer:
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             for model_name in candidate_models:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={settings.GEMINI_API_KEY}"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
                 try:
                     res = await client.post(url, headers=headers, json=payload)
                     data = res.json()
@@ -130,7 +156,9 @@ class LLMRootCauseAnalyzer:
                     content = data["candidates"][0]["content"]["parts"][0]["text"]
                     try:
                         parsed = extract_json_from_text(content)
-                        return RootCauseAnalysisResult.model_validate(parsed)
+                        result = RootCauseAnalysisResult.model_validate(parsed)
+                        self.last_engine = f"Gemini ({model_name})"
+                        return result
                     except Exception as parse_err:
                         logger.warning(f"LLM validation failed on {model_name}: {parse_err}. Retrying once with explicit schema follow-up...")
                         retry_payload = {
@@ -152,7 +180,9 @@ class LLMRootCauseAnalyzer:
                         res_retry = await client.post(url, headers=headers, json=retry_payload)
                         retry_content = res_retry.json()["candidates"][0]["content"]["parts"][0]["text"]
                         parsed_retry = extract_json_from_text(retry_content)
-                        return RootCauseAnalysisResult.model_validate(parsed_retry)
+                        result = RootCauseAnalysisResult.model_validate(parsed_retry)
+                        self.last_engine = f"Gemini ({model_name}, after schema retry)"
+                        return result
                 except Exception as call_err:
                     last_error = call_err
                     logger.warning(f"Error calling {model_name}: {call_err}. Trying next candidate...")
@@ -163,6 +193,10 @@ class LLMRootCauseAnalyzer:
             raise RuntimeError("All Gemini candidate models failed.")
 
     def _local_semantic_analysis(self, context: ContextPayload) -> RootCauseAnalysisResult:
+        self.last_engine = "Local fallback engine"
+        return self._local_semantic_analysis_impl(context)
+
+    def _local_semantic_analysis_impl(self, context: ContextPayload) -> RootCauseAnalysisResult:
         """
         Deterministic, calibrated fallback reasoning engine for offline/test environments.
         Guarantees strict Pydantic validity, cites exact event IDs, and generates copy-only guidance.

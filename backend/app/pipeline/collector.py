@@ -2,7 +2,7 @@ import asyncio
 import subprocess
 import shutil
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import AsyncGenerator, List, Optional, Dict, Any
 from backend.app.models.entities import LogEventModel
 from backend.app.models.schemas import LogEventCreate
@@ -216,7 +216,7 @@ def generate_synthetic_events(
             raw_line=line,
             source=source,
             host=host,
-            timestamp=now
+            timestamp=now + timedelta(milliseconds=50 * i),
         )
         events.append(event)
     return events
