@@ -210,6 +210,15 @@ async def trigger_analysis(
     res_events = await db.execute(stmt_events)
     ev_rows = res_events.scalars().all()
 
+    if not ev_rows:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "EVENTS_NOT_FOUND",
+                "message": "None of the incident's correlated_event_ids exist in the log_events table",
+            },
+        )
+
     # Build ContextPayload
     events_summary = [
         IncidentEventSummary(

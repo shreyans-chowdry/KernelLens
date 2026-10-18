@@ -53,7 +53,8 @@ export default function IncidentDetailPage() {
     setUpdatingStatus(true);
     try {
       const updated = await updateIncidentStatus(incident.id, newStatus);
-      setIncident(updated);
+      // PATCH response omits `events`, and the client returns null on failure
+      setIncident(updated ? { ...incident, ...updated } : { ...incident, status: newStatus });
     } catch {
       // If API fails, toggle locally in UI
       setIncident({ ...incident, status: newStatus });

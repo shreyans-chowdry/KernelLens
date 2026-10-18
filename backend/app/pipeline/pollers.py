@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 import shutil
 import logging
 from datetime import datetime, timezone
@@ -55,7 +56,9 @@ class DmesgPoller:
             logger.warning("dmesg not available on this platform, returning synthetic events")
             return generate_synthetic_events("oom_killer")
 
-        cmd = ["dmesg", "-T"]
+        # Raw monotonic timestamps ("[ 1234.567890] ...") so kernel_time can be parsed
+        # and used as the high-water mark (with -T the timestamps are human-readable).
+        cmd = ["dmesg"]
         try:
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -66,10 +69,14 @@ class DmesgPoller:
             lines = stdout.decode("utf-8", errors="replace").splitlines()
 
             new_events: List[LogEventModel] = []
+            high_water = self.last_seen_kernel_time
             for line in lines:
                 stripped = line.strip()
                 if not stripped:
                     continue
+                m = re.match(r"^\[\s*(\d+\.\d+)\]", stripped)
+                if m and float(m.group(1)) <= high_water:
+                    continue  # already emitted in a previous poll cycle
                 event = self.normalize_line(stripped)
                 new_events.append(event)
             return new_events

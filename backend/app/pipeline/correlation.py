@@ -1,18 +1,13 @@
 # =========================================================================
-# THROWAWAY MVP SCAFFOLD — TEMPORAL EVENT CORRELATION
-# 
-# WARNING: This fixed time-window correlation is a temporary placeholder!
-# Per Section 3.3 of our Review 1 report ("LLM-Driven Dynamic Kernel Log
-# Root Cause Analyzer"), Event Correlation MUST use a trained semantic
-# similarity and embedding model (TF-IDF / sentence-transformers + temporal
-# clustering), not raw sliding windows without semantic awareness.
+# EVENT CORRELATION — public interface
 #
-# This temporary temporal correlation step exists ONLY as an MVP scaffold
-# to allow downstream pipeline stages (Context Construction, LLM Root-Cause
-# Analysis, and Dashboard) to be developed and demoed end-to-end before
-# the real trained ML model is finalized in Phase 2.
+# correlate_events() is the production path: it delegates to the trained
+# SemanticTemporalCorrelator (TF-IDF similarity + temporal window + graph
+# clustering) in backend/app/ml/event_correlation.py, per Section 3.2.2.
 #
-# DO NOT RETAIN THIS IN THE FINAL LAB EVALUATION OR FINAL PROJECT RELEASE.
+# TemporalCorrelationScaffold below is the original time-window-only MVP.
+# It is kept solely as a baseline for comparison tests
+# (correlate_events_temporal_only) and to convert clusters into incident rows.
 # =========================================================================
 
 import uuid
