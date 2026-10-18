@@ -1,46 +1,27 @@
-import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
-import "./globals.css";
-import Navbar from "@/components/layout/Navbar";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains",
-  subsets: ["latin"],
-  display: "swap",
-});
+import type { Metadata, Viewport } from 'next';
+import '@fontsource-variable/schibsted-grotesk';
+import '@fontsource/ibm-plex-mono/400.css';
+import '@fontsource/ibm-plex-mono/500.css';
+import './globals.css';
+import TopBar from '@/components/TopBar';
 
 export const metadata: Metadata = {
-  title: "KernelLens AI — Intelligent Linux Kernel Log Diagnostics",
+  title: 'KernelLens',
   description:
-    "LLM-driven root cause analysis for Linux kernel and system logs. Automated anomaly detection, event correlation, and troubleshooting guidance powered by trained ML models and Gemini.",
-  keywords: [
-    "KernelLens",
-    "Linux",
-    "kernel logs",
-    "root cause analysis",
-    "LLM",
-    "anomaly detection",
-    "machine learning",
-    "incident response",
-  ],
+    'Root-cause analysis for Linux kernel logs: ML anomaly filtering, semantic-temporal correlation and LLM diagnosis with cited evidence.',
+};
+
+export const viewport: Viewport = {
+  themeColor: '#F6F5F1',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en"
-      className={`${inter.variable} ${jetbrainsMono.variable} h-full`}
-      style={{ colorScheme: "light" }}
-    >
-      <body className="min-h-full bg-cream-light text-kl-black antialiased" style={{ fontFamily: 'var(--font-inter), system-ui, sans-serif' }}>
-        <Navbar />
-        <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
+    <html lang="en">
+      <body>
+        <a href="#main" className="skip-link">Skip to content</a>
+        <TopBar />
+        <main id="main">{children}</main>
       </body>
     </html>
   );
