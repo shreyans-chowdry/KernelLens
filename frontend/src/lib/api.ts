@@ -1,7 +1,7 @@
 /**
- * KernelLens AI — Unified API Client
- * Handles all communication with the FastAPI backend.
- * Returns authentic live telemetry; clean empty states when database is cleared.
+ * KernelLens AI — API client for the FastAPI backend.
+ * Every function throws ApiError on failure so pages can tell
+ * "backend unreachable" apart from "no data yet".
  */
 
 import type {
@@ -15,153 +15,121 @@ import type {
   SeedResult,
 } from './types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-// ============================================
-// Generic fetch wrapper with error handling
-// ============================================
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
-
-    const res = await fetch(`${API_BASE}${path}`, {
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      ...options,
-    });
-    clearTimeout(timeoutId);
-
-    if (!res.ok) {
-      throw new Error(`API error: ${res.status} ${res.statusText}`);
-    }
-
-    return await res.json();
-  } catch (error) {
-    console.warn(`API fetch failed for ${path}:`, error);
-    throw error;
+export class ApiError extends Error {
+  constructor(message: string, public status: number | null) {
+    super(message);
+    this.name = 'ApiError';
   }
 }
 
-// ============================================
-// Log Events API
-// ============================================
-export async function fetchLogs(params?: {
+async function apiFetch<T>(path: string, options: RequestInit = {}, timeoutMs = 6000): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      signal: controller.signal,
+    });
+  } catch {
+    throw new ApiError(`Can't reach the KernelLens backend at ${API_BASE}.`, null);
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!res.ok) {
+    let message = `The backend returned ${res.status}.`;
+    try {
+      const body = await res.json();
+      if (body?.error?.message) message = body.error.message;
+    } catch {
+      /* body was not JSON */
+    }
+    throw new ApiError(message, res.status);
+  }
+  return res.json() as Promise<T>;
+}
+
+function qs(params: Record<string, string | number | boolean | undefined>): string {
+  const sp = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== '') sp.set(k, String(v));
+  });
+  const s = sp.toString();
+  return s ? `?${s}` : '';
+}
+
+// ---------- Health ----------
+export async function checkHealth(): Promise<boolean> {
+  const root = API_BASE.replace(/\/api\/v1\/?$/, '');
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(`${root}/health`, { signal: controller.signal });
+    clearTimeout(timer);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ---------- Logs ----------
+export function fetchLogs(params: {
   source?: string;
   host?: string;
   is_anomalous?: boolean;
   limit?: number;
   offset?: number;
-}): Promise<LogEvent[]> {
-  const searchParams = new URLSearchParams();
-  if (params?.source) searchParams.set('source', params.source);
-  if (params?.host) searchParams.set('host', params.host);
-  if (params?.is_anomalous !== undefined) searchParams.set('is_anomalous', String(params.is_anomalous));
-  if (params?.limit) searchParams.set('limit', String(params.limit));
-  if (params?.offset) searchParams.set('offset', String(params.offset));
-
-  const qs = searchParams.toString();
-  try {
-    return await apiFetch<LogEvent[]>(`/logs${qs ? `?${qs}` : ''}`);
-  } catch {
-    return [];
-  }
+} = {}): Promise<LogEvent[]> {
+  return apiFetch<LogEvent[]>(`/logs${qs(params)}`);
 }
 
-export async function fetchLogDetail(id: string): Promise<LogEventDetail | null> {
-  try {
-    return await apiFetch<LogEventDetail>(`/logs/${id}`);
-  } catch {
-    return null;
-  }
+export function fetchLogDetail(id: string): Promise<LogEventDetail> {
+  return apiFetch<LogEventDetail>(`/logs/${encodeURIComponent(id)}`);
 }
 
-export async function fetchLogStats(): Promise<LogStats> {
-  try {
-    return await apiFetch<LogStats>('/logs/stats');
-  } catch {
-    return { total_logs: 0, anomaly_count: 0, sources: {} };
-  }
+export function fetchLogStats(): Promise<LogStats> {
+  return apiFetch<LogStats>('/logs/stats');
 }
 
-// ============================================
-// Incidents API
-// ============================================
-export async function fetchIncidents(params?: {
-  status?: string;
-  limit?: number;
-  offset?: number;
-}): Promise<Incident[]> {
-  const searchParams = new URLSearchParams();
-  if (params?.status) searchParams.set('status', params.status);
-  if (params?.limit) searchParams.set('limit', String(params.limit));
-  if (params?.offset) searchParams.set('offset', String(params.offset));
-
-  const qs = searchParams.toString();
-  try {
-    return await apiFetch<Incident[]>(`/incidents${qs ? `?${qs}` : ''}`);
-  } catch {
-    return [];
-  }
+// ---------- Incidents ----------
+export function fetchIncidents(params: { status?: 'active' | 'resolved'; limit?: number } = {}): Promise<Incident[]> {
+  return apiFetch<Incident[]>(`/incidents${qs(params)}`);
 }
 
-export async function fetchIncidentDetail(id: string): Promise<Incident | null> {
-  try {
-    return await apiFetch<Incident>(`/incidents/${id}`);
-  } catch {
-    return null;
-  }
+export function fetchIncidentDetail(id: string): Promise<Incident> {
+  return apiFetch<Incident>(`/incidents/${encodeURIComponent(id)}`);
 }
 
-export async function fetchIncidentCount(status?: string): Promise<IncidentCount> {
-  const qs = status ? `?status=${status}` : '';
-  try {
-    return await apiFetch<IncidentCount>(`/incidents/count${qs}`);
-  } catch {
-    return { count: 0 };
-  }
+export function fetchIncidentCount(status?: 'active' | 'resolved'): Promise<IncidentCount> {
+  return apiFetch<IncidentCount>(`/incidents/count${qs({ status })}`);
 }
 
-export async function updateIncidentStatus(id: string, status: 'active' | 'resolved'): Promise<Incident | null> {
-  try {
-    return await apiFetch<Incident>(`/incidents/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    });
-  } catch {
-    return null;
-  }
+export function updateIncidentStatus(id: string, status: 'active' | 'resolved'): Promise<Incident> {
+  return apiFetch<Incident>(`/incidents/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
 }
 
-// ============================================
-// Analytics API
-// ============================================
-export async function fetchPipelineStats(): Promise<PipelineStats> {
-  try {
-    return await apiFetch<PipelineStats>('/analytics/pipeline');
-  } catch {
-    return {
-      total_logs: 0,
-      anomaly_count: 0,
-      incident_count: 0,
-      active_incidents: 0,
-      resolved_incidents: 0,
-      reduction_ratio_pct: 0,
-    };
-  }
+/** Runs the LLM root-cause stage again. Gemini can take several seconds. */
+export function analyzeIncident(id: string): Promise<Incident> {
+  return apiFetch<Incident>(`/incidents/${encodeURIComponent(id)}/analyze`, { method: 'POST' }, 90000);
 }
 
-export async function fetchTimeline(): Promise<TimelinePoint[]> {
-  try {
-    return await apiFetch<TimelinePoint[]>('/analytics/timeline');
-  } catch {
-    return [];
-  }
+// ---------- Analytics ----------
+export function fetchPipelineStats(): Promise<PipelineStats> {
+  return apiFetch<PipelineStats>('/analytics/pipeline');
 }
 
-// ============================================
-// Demo API
-// ============================================
-export async function seedDemoData(): Promise<SeedResult> {
-  return apiFetch<SeedResult>('/demo/seed', { method: 'POST' });
+export function fetchTimeline(): Promise<TimelinePoint[]> {
+  return apiFetch<TimelinePoint[]>('/analytics/timeline');
+}
+
+// ---------- Demo ----------
+export function seedDemoData(): Promise<SeedResult> {
+  return apiFetch<SeedResult>('/demo/seed', { method: 'POST' }, 30000);
 }
