@@ -175,3 +175,42 @@ def test_training_features_do_not_depend_on_wall_clock():
         return rows
 
     assert numeric_features(pause=False) == numeric_features(pause=True)
+
+
+# --------------------------------------------------------------------------
+# Deployment: hosted Postgres URLs and the public-analysis rate limit
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize("raw, expected", [
+    ("postgres://u:p@host:5432/db", "postgresql+asyncpg://u:p@host:5432/db"),
+    ("postgresql://u:p@host/db?sslmode=require", "postgresql+asyncpg://u:p@host/db?ssl=require"),
+    ("postgresql://u:p@host/db?sslmode=require&channel_binding=require", "postgresql+asyncpg://u:p@host/db?ssl=require"),
+    ("postgresql+asyncpg://u@localhost/db", "postgresql+asyncpg://u@localhost/db"),
+    ("sqlite+aiosqlite:///./x.db", "sqlite+aiosqlite:///./x.db"),
+])
+def test_database_url_is_normalised_for_asyncpg(raw, expected):
+    from backend.app.core.config import Settings
+
+    assert Settings(DATABASE_URL=raw).DATABASE_URL == expected
+
+
+def test_cors_origins_parsing():
+    from backend.app.core.config import Settings
+
+    s = Settings(CORS_ORIGINS="https://kernellens.vercel.app/, http://localhost:3000")
+    assert s.cors_origins == ["https://kernellens.vercel.app", "http://localhost:3000"]
+    assert Settings(CORS_ORIGINS="*").cors_origins == ["*"]
+
+
+def test_analysis_rate_limit(monkeypatch):
+    from fastapi import HTTPException
+    from backend.app.api import incidents
+
+    monkeypatch.setattr(incidents.settings, "GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(incidents.settings, "ANALYZE_RATE_LIMIT_PER_MIN", 2)
+    incidents._recent_analyses.clear()
+    incidents._check_analysis_rate_limit()
+    incidents._check_analysis_rate_limit()
+    with pytest.raises(HTTPException) as exc:
+        incidents._check_analysis_rate_limit()
+    assert exc.value.status_code == 429
+    incidents._recent_analyses.clear()

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { API_BASE, ApiError, seedDemoData } from '@/lib/api';
+import { API_BASE, ApiError, backendNotConfigured, seedDemoData } from '@/lib/api';
 
 export function LoadingBlock({ label = 'Loading', lines = 4 }: { label?: string; lines?: number }) {
   return (
@@ -14,6 +14,19 @@ export function LoadingBlock({ label = 'Loading', lines = 4 }: { label?: string;
 }
 
 export function ErrorNotice({ error, onRetry }: { error: ApiError; onRetry?: () => void }) {
+  if (backendNotConfigured()) {
+    return (
+      <div className="notice notice-error" role="alert">
+        <p className="notice-title">This deployment is not connected to a backend</p>
+        <p className="notice-body">
+          The site was built without <code>NEXT_PUBLIC_API_URL</code>, so it is looking for the API at{' '}
+          <code>{API_BASE}</code>, which only exists on a developer&apos;s own machine. Deploy the FastAPI backend,
+          set <code>NEXT_PUBLIC_API_URL</code> to its <code>/api/v1</code> address in the hosting settings, and
+          redeploy the frontend.
+        </p>
+      </div>
+    );
+  }
   const offline = error.status === null;
   return (
     <div className="notice notice-error" role="alert">
@@ -22,8 +35,8 @@ export function ErrorNotice({ error, onRetry }: { error: ApiError; onRetry?: () 
         {error.message}
         {offline && (
           <>
-            {' '}Start it from the project folder with{' '}
-            <code>uvicorn backend.app.main:app --reload</code>, then try again.
+            {' '}If it runs on a free hosting plan it may be waking up, which can take up to a minute. Locally, start it
+            from the project folder with <code>uvicorn backend.app.main:app --reload</code>.
           </>
         )}
       </p>

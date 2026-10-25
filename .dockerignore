@@ -1,0 +1,14 @@
+.git
+.env
+**/.env
+**/.env.*
+frontend
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.venv
+**/*.db
+*.docx
+*.pdf
+*.md
+!backend/README.md

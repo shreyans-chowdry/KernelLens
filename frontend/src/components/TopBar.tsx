@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { checkHealth } from '@/lib/api';
+import { backendNotConfigured, checkHealth } from '@/lib/api';
 
 const NAV = [
   { href: '/', label: 'Overview' },
@@ -55,7 +55,13 @@ export default function TopBar() {
         <div className="backend-status" role="status" aria-live="polite">
           <span className={`status-dot ${online === null ? 'is-pending' : online ? 'is-on' : 'is-off'}`} aria-hidden="true" />
           <span className="backend-status-text">
-            {online === null ? 'Checking backend' : online ? 'Backend connected' : 'Backend offline'}
+            {online === null
+              ? 'Checking backend'
+              : online
+                ? 'Backend connected'
+                : backendNotConfigured()
+                  ? 'No backend configured'
+                  : 'Backend offline'}
           </span>
         </div>
       </div>

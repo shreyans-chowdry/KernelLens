@@ -1,4 +1,6 @@
+import time
 import uuid
+from collections import deque
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,6 +9,7 @@ from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from backend.app.core.config import settings
 from backend.app.core.database import get_db
 from backend.app.models.entities import (
     IncidentModel,
@@ -28,6 +31,30 @@ from backend.app.models.schemas import (
 from backend.app.pipeline.llm_analysis import analyze_root_cause
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
+
+
+# Timestamps of recent LLM analyses (process-wide), for a simple sliding-window limit
+_recent_analyses: deque = deque()
+
+
+def _check_analysis_rate_limit() -> None:
+    limit = settings.ANALYZE_RATE_LIMIT_PER_MIN
+    if limit <= 0 or not settings.GEMINI_API_KEY:
+        return
+    now = time.monotonic()
+    while _recent_analyses and now - _recent_analyses[0] > 60:
+        _recent_analyses.popleft()
+    if len(_recent_analyses) >= limit:
+        retry_after = int(60 - (now - _recent_analyses[0])) + 1
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "code": "RATE_LIMITED",
+                "message": f"Too many analyses in the last minute. Try again in {retry_after} s.",
+                "details": {"retry_after_seconds": retry_after},
+            },
+        )
+    _recent_analyses.append(now)
 
 
 class StatusUpdate(BaseModel):
@@ -177,6 +204,7 @@ async def get_incident(
     responses={
         404: {"model": ErrorEnvelope},
         400: {"model": ErrorEnvelope},
+        429: {"model": ErrorEnvelope},
     },
 )
 async def trigger_analysis(
@@ -218,6 +246,8 @@ async def trigger_analysis(
                 "message": "None of the incident's correlated_event_ids exist in the log_events table",
             },
         )
+
+    _check_analysis_rate_limit()
 
     # Build ContextPayload
     events_summary = [

@@ -15,7 +15,19 @@ import type {
   SeedResult,
 } from './types';
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
+
+/**
+ * True when the page is served from a real domain (e.g. Vercel) but still points at
+ * localhost, i.e. NEXT_PUBLIC_API_URL was not set when the site was built.
+ * The browser would look for the API on the visitor's own machine.
+ */
+export function backendNotConfigured(): boolean {
+  if (typeof window === 'undefined') return false;
+  const pageIsLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
+  const apiIsLocal = /\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(API_BASE);
+  return !pageIsLocal && apiIsLocal;
+}
 
 export class ApiError extends Error {
   constructor(message: string, public status: number | null) {
@@ -24,7 +36,7 @@ export class ApiError extends Error {
   }
 }
 
-async function apiFetch<T>(path: string, options: RequestInit = {}, timeoutMs = 6000): Promise<T> {
+async function apiFetch<T>(path: string, options: RequestInit = {}, timeoutMs = 30000): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
@@ -34,8 +46,14 @@ async function apiFetch<T>(path: string, options: RequestInit = {}, timeoutMs = 
       headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
       signal: controller.signal,
     });
-  } catch {
-    throw new ApiError(`Can't reach the KernelLens backend at ${API_BASE}.`, null);
+  } catch (err) {
+    const timedOut = err instanceof DOMException && err.name === 'AbortError';
+    throw new ApiError(
+      timedOut
+        ? `The KernelLens backend at ${API_BASE} did not answer within ${Math.round(timeoutMs / 1000)} s.`
+        : `Can't reach the KernelLens backend at ${API_BASE}.`,
+      null,
+    );
   } finally {
     clearTimeout(timer);
   }
@@ -67,7 +85,7 @@ export async function checkHealth(): Promise<boolean> {
   const root = API_BASE.replace(/\/api\/v1\/?$/, '');
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3000);
+    const timer = setTimeout(() => controller.abort(), 10000);
     const res = await fetch(`${root}/health`, { signal: controller.signal });
     clearTimeout(timer);
     return res.ok;
