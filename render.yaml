@@ -1,6 +1,12 @@
-# One-click deploy of the KernelLens backend + Postgres on Render.
+# One-click deploy of the KernelLens backend on Render.
 # Render dashboard -> New -> Blueprint -> pick this repo.
-# You will be asked for GEMINI_API_KEY and CORS_ORIGINS (your Vercel URL).
+#
+# The database is NOT created here (Render allows only one free Postgres per
+# account). Create a free Postgres on Neon (neon.tech) and paste its connection
+# string as DATABASE_URL. Plain postgres:// / postgresql:// URLs with
+# ?sslmode=require are converted for asyncpg automatically.
+#
+# You will be asked for: DATABASE_URL, GEMINI_API_KEY, CORS_ORIGINS (your Vercel URL).
 services:
   - type: web
     name: kernellens-api
@@ -10,17 +16,10 @@ services:
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: kernellens-db
-          property: connectionString
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: CORS_ORIGINS
         sync: false
       - key: ANALYZE_RATE_LIMIT_PER_MIN
         value: "6"
-
-databases:
-  - name: kernellens-db
-    plan: free
-    databaseName: kernellens
