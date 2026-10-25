@@ -11,6 +11,7 @@ services:
   - type: web
     name: kernellens-api
     runtime: docker
+    region: ohio  # same AWS region as the Neon database (us-east-2)
     plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
